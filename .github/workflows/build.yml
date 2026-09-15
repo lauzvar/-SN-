@@ -1,0 +1,26 @@
+name: Build Valenbot
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: java-spring-v2/pom.xml
+      - name: Verify and package
+        working-directory: java-spring-v2
+        run: mvn --batch-mode --no-transfer-progress clean verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Valenbot-v2.1.0-JAR
+          path: java-spring-v2/target/robot-sn-system-2.1.0.jar
+          if-no-files-found: error

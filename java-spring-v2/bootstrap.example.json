@@ -1,0 +1,7 @@
+{
+  "accounts": [
+    {"username":"admin_trial","role":"ADMIN","password":"REPLACE_WITH_UNIQUE_PASSWORD_1","snPermission":true},
+    {"username":"tech_trial","role":"TECHNICIAN","password":"REPLACE_WITH_UNIQUE_PASSWORD_2","snPermission":true},
+    {"username":"user_trial","role":"USER","password":"REPLACE_WITH_UNIQUE_PASSWORD_3","snPermission":false}
+  ]
+}

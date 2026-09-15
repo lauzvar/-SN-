@@ -1,0 +1,9 @@
+{
+  "java": "C:/path/to/jdk-17/bin/java.exe",
+  "dbHost": "127.0.0.1",
+  "dbPort": 5432,
+  "database": "robot_sn_v2",
+  "dbUser": "robot_v2",
+  "port": 8082,
+  "publicUrl": "http://YOUR-LAN-IP:8082"
+}

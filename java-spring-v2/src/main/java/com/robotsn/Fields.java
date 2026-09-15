@@ -1,0 +1,8 @@
+package com.robotsn;
+import java.util.*;
+public final class Fields {
+  private Fields(){}
+  // Workbook column positions stay explicit: column M is delivery date, not activation date.
+  public static final String[] KEYS={"sn","model","productionDate","hardwareVersion","firmwareVersion","nickname","color","wifiMac","bluetoothMac","status","warrantyEnd","customer","deliveryDate","osVersion","aiVersion","asrVersion","ttsVersion","motionVersion","visionVersion","emotionVersion","otaVersion","cloudVersion","主控板","舵机控制器","头部舵机","左臂舵机","右臂舵机","腰部舵机","左腿舵机","右腿舵机","麦克风阵列","扬声器","摄像头","电池","传感器模组","assemblyPerson","assemblyDate","snEntryPerson","snEntryDate","debugPerson","debugDate","debugResult","qcPerson","qcDate","qcReport","remarks"};
+  public static final String[] LABELS={"SN码","产品型号","生产日期","硬件版本","固件版本","机器人昵称","外观颜色","WiFi MAC地址","蓝牙MAC地址","设备状态","保修截止日期","客户名称","交付日期","主控系统版本","AI对话引擎版本","语音识别版本","语音合成版本","运动控制版本","视觉识别版本","情感计算版本","OTA版本","云端服务版本","主控板SN","舵机控制器SN","头部舵机SN","左臂舵机SN","右臂舵机SN","腰部舵机SN","左腿舵机SN","右腿舵机SN","麦克风阵列SN","扬声器SN","摄像头SN","电池SN","传感器模组SN","装配人员","装配日期","SN烧录人员","烧录日期","整机测试人员","测试日期","测试结果","质检人员","质检日期","出厂报告编号","备注"};
+}

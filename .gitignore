@@ -1,0 +1,26 @@
+# Private operational material must never enter source control.
+runtime/
+**/runtime/
+**/target/
+**/__pycache__/
+*.pyc
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.log
+*.jar
+*.zip
+*.xlsx
+*.xls
+.env
+.env.*
+!.env.example
+credentials.xml
+*credentials*.xml
+bootstrap.json
+trial-accounts.json
+config.json
+.idea/
+.vscode/

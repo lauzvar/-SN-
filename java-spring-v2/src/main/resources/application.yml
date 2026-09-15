@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: ${VALENBOT_DB_URL:jdbc:postgresql://127.0.0.1:5432/robot_sn_v2}
+    username: ${VALENBOT_DB_USER:robot_v2}
+    password: ${VALENBOT_DB_PASSWORD}
+  flyway:
+    enabled: true
+server:
+  address: 0.0.0.0
+  port: ${VALENBOT_PORT:8082}
+  servlet:
+    session:
+      cookie:
+        name: ${VALENBOT_SESSION_COOKIE:VALENBOT_V2_SESSION_${VALENBOT_PORT:8082}}
+        http-only: true
+        same-site: lax
+      timeout: 60m
+  error:
+    include-message: never
+valenbot:
+  public-url: ${VALENBOT_PUBLIC_URL:http://127.0.0.1:8082}
+  bootstrap-file: ${VALENBOT_BOOTSTRAP_FILE:}
