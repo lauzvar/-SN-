@@ -49,15 +49,16 @@ jobs:
         run: python java-spring-v2/tests/run_acceptance.py
       - uses: actions/upload-artifact@v4
         with:
-          name: Valenbot-v2.2.0-JAR
-          path: java-spring-v2/target/robot-sn-system-2.2.0.jar
+          name: Valenbot-v2.3.0-JAR
+          path: java-spring-v2/target/robot-sn-system-2.3.0.jar
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Valenbot-v2.2.0-test-reports
+          name: Valenbot-v2.3.0-test-reports
           path: |
             java-spring-v2/target/surefire-reports/*.xml
             ${{ runner.temp }}/valenbot-test/test_v21.py.log
             ${{ runner.temp }}/valenbot-test/test_v22.py.log
+            ${{ runner.temp }}/valenbot-test/test_v23.py.log
           if-no-files-found: warn

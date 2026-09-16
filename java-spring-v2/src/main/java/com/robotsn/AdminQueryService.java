@@ -14,20 +14,9 @@ public class AdminQueryService {
   }
 
   public Object audit() {
-    s.technical();
-    var a = s.account();
+    s.admin();
     var rows = repository.findAuditLogForAudit(s.role(), s.actor());
-    var allowed = new HashSet<String>();
-    repository.findRobotForAudit().stream()
-        .filter(s::allowed)
-        .forEach(r -> allowed.add(r.get("sn").toString()));
     return rows.stream()
-        .filter(
-            r ->
-                s.role().equals("ADMIN")
-                    || r.get("actor").equals(s.actor())
-                    || allowed.contains(s.resolve(r.get("object_id").toString())))
-        .limit(2000)
         .map(
             r -> {
               r.put("old_value", s.decode(r.get("old_value")));
@@ -43,12 +32,7 @@ public class AdminQueryService {
   }
 
   public Object sources() {
-    s.technical();
-    var a = s.account();
-    if (!s.role().equals("ADMIN")
-        && (!((List<?>) s.decode(a.get("scope_sns"))).isEmpty()
-            || !a.get("scope_customer").toString().isBlank()))
-      Store.fail(403, "原始表包含全量数据，仅无范围限制的技术人员和管理员可查看");
+    s.admin();
     var imports = repository.findSourceImportForSources();
     imports.forEach(
         r -> {

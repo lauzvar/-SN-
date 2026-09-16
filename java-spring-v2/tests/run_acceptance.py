@@ -13,7 +13,7 @@ def main():
     private=Path(os.environ['VALENBOT_TEST_PRIVATE']).resolve()
     if not (private/'bootstrap.json').is_file():raise SystemExit('Generate synthetic fixtures first')
     project=Path(__file__).resolve().parents[1]
-    jar=project/'target/robot-sn-system-2.2.0.jar'
+    jar=project/'target/robot-sn-system-2.3.0.jar'
     env={**os.environ,'VALENBOT_PORT':'8083','VALENBOT_PUBLIC_URL':'http://127.0.0.1:8083',
          'VALENBOT_TEST_URL':'http://127.0.0.1:8083','VALENBOT_BOOTSTRAP_FILE':str(private/'bootstrap.json'),
          'PYTHONIOENCODING':'utf-8'}
@@ -32,7 +32,7 @@ def main():
                         if response.status==200:break
                 except Exception:time.sleep(1)
             else:raise RuntimeError('Test server startup timed out')
-            for script in ['test_v21.py','test_v22.py']:
+            for script in ['test_v21.py','test_v22.py','test_v23.py']:
                 result=subprocess.run([sys.executable,str(project/'tests'/script)],env=env,capture_output=True,text=True,encoding='utf-8')
                 (private/(script+'.log')).write_text(result.stdout+result.stderr,encoding='utf-8')
                 print(result.stdout+result.stderr)

@@ -13,6 +13,11 @@ runtime/
 *.jar
 *.zip
 *.xlsx
+!java-spring-v2/src/main/resources/templates/robot-import-template.xlsx
+*.p12
+*.pfx
+*.pem
+*.cer
 *.xls
 .env
 .env.*

@@ -8,6 +8,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class ApiErrors {
+  @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+  ResponseEntity<?> oversized(Exception e) {
+    return ResponseEntity.status(413).body(Map.of("message", "文件过大，请使用不超过 2 MB 的 .xlsx 模板"));
+  }
+
   @ExceptionHandler(ResponseStatusException.class)
   ResponseEntity<?> business(ResponseStatusException e) {
     return ResponseEntity.status(e.getStatusCode())
