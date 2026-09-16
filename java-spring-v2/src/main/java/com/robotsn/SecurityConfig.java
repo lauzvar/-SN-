@@ -32,6 +32,9 @@ public class SecurityConfig {
   SecurityFilterChain security(HttpSecurity http, JdbcTemplate db) throws Exception {
     var success = new SavedRequestAwareAuthenticationSuccessHandler();
     success.setDefaultTargetUrl("/");
+    // The preserved v1 application still uses HTTP on this host. HSTS applies to
+    // all ports of a hostname, so enable it only after migrating those services.
+    http.headers(headers -> headers.httpStrictTransportSecurity(hsts -> hsts.disable()));
     http.authorizeHttpRequests(
             a ->
                 a.requestMatchers("/login", "/css/**", "/js/**", "/favicon.ico")

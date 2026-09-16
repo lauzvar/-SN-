@@ -69,7 +69,7 @@ public class RobotQueryService {
       out.put("repairEvents", repository.findRepairEventForDetail(current));
       out.put("flashTasks", repository.findFlashTaskForDetail(current));
       out.put("readbacks", repository.findFlashReadbackForDetail(current));
-      out.put("source", row.get("source"));
+      if (s.role().equals("ADMIN")) out.put("source", row.get("source"));
     }
     return out;
   }

@@ -4,6 +4,8 @@
   "dbPort": 5432,
   "database": "robot_sn_v2",
   "dbUser": "robot_v2",
-  "port": 8082,
-  "publicUrl": "http://YOUR-LAN-IP:8082"
+  "port": 8443,
+  "publicUrl": "https://YOUR-LAN-IP:8443",
+  "https": true,
+  "httpPort": 8082
 }

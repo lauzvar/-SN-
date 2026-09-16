@@ -13,10 +13,7 @@ public class AdminQueryRepository {
   }
 
   public List<Map<String, Object>> findAuditLogForAudit(Object value1, Object value2) {
-    return db.queryForList(
-        "select * from audit_log where ?='ADMIN' or actor=? or object_type='robot' order by id desc",
-        value1,
-        value2);
+    return db.queryForList("select * from audit_log order by id desc limit 2000");
   }
 
   public List<Map<String, Object>> findRobotForAudit() {
