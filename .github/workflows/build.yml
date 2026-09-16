@@ -1,4 +1,4 @@
-name: Build Valenbot
+name: Build and verify Valenbot
 on:
   push:
   pull_request:
@@ -8,6 +8,25 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: robot_sn_v2_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ephemeral_ci_database_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d robot_sn_v2_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      VALENBOT_DB_URL: jdbc:postgresql://127.0.0.1:5432/robot_sn_v2_test
+      VALENBOT_DB_USER: postgres
+      VALENBOT_DB_PASSWORD: ephemeral_ci_database_only
+      VALENBOT_TEST_ACK: robot_sn_v2_test
+      VALENBOT_TEST_PRIVATE: ${{ runner.temp }}/valenbot-test
+      VALENBOT_BOOTSTRAP_FILE: ${{ runner.temp }}/valenbot-test/bootstrap.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -16,11 +35,27 @@ jobs:
           java-version: '17'
           cache: maven
           cache-dependency-path: java-spring-v2/pom.xml
-      - name: Verify and package
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate synthetic fixtures
+        run: python java-spring-v2/tests/synthetic_fixture.py "$VALENBOT_TEST_PRIVATE"
+      - name: Format, unit and PostgreSQL transaction tests
         working-directory: java-spring-v2
-        run: mvn --batch-mode --no-transfer-progress clean verify
+        run: mvn --batch-mode --no-transfer-progress spotless:check clean verify
+      - name: HTTP permission and business regression
+        run: python java-spring-v2/tests/run_acceptance.py
       - uses: actions/upload-artifact@v4
         with:
-          name: Valenbot-v2.1.0-JAR
-          path: java-spring-v2/target/robot-sn-system-2.1.0.jar
+          name: Valenbot-v2.2.0-JAR
+          path: java-spring-v2/target/robot-sn-system-2.2.0.jar
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Valenbot-v2.2.0-test-reports
+          path: |
+            java-spring-v2/target/surefire-reports/*.xml
+            ${{ runner.temp }}/valenbot-test/test_v21.py.log
+            ${{ runner.temp }}/valenbot-test/test_v22.py.log
+          if-no-files-found: warn

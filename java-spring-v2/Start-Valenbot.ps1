@@ -6,7 +6,7 @@ if (-not (Test-Path -LiteralPath $ConfigFile)) { throw 'Config file is missing. 
 $cfg = Get-Content -Raw -Encoding UTF8 -LiteralPath $ConfigFile | ConvertFrom-Json
 if ($cfg.database -ne 'robot_sn_v2') { throw 'This launcher only runs the independent robot_sn_v2 database.' }
 $runtimeRoot = Split-Path (Resolve-Path -LiteralPath $ConfigFile).Path -Parent
-$jar = Join-Path $runtimeRoot 'robot-sn-system-2.1.0.jar'
+$jar = Join-Path $runtimeRoot 'robot-sn-system-2.2.0.jar'
 if (-not (Test-Path -LiteralPath $jar)) { throw "JAR not found: $jar" }
 if (Get-NetTCPConnection -State Listen -LocalPort $cfg.port -ErrorAction SilentlyContinue) { Write-Host "Port $($cfg.port) is already in use. Check http://127.0.0.1:$($cfg.port)/"; exit 1 }
 $cred = Import-Clixml -LiteralPath (Join-Path $runtimeRoot 'credentials.xml')

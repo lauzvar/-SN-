@@ -44,6 +44,7 @@ class UpgradeAcceptance(unittest.TestCase):
   self.assertEqual(a.call('/robots')[0]['robotId'],self.id1)
   self.a.call('/users/'+un,'PATCH',{'customerName':'不能仅凭名称绑定','reason':'局部保存'},400)
   self.a.call('/users/'+ua,'PATCH',{'boundRobotId':self.id2,'customerName':'冲突客户','reason':'不可抢占'},409)
+  (PRIVATE/'upgrade-2.1.0').mkdir(parents=True,exist_ok=True)
   (PRIVATE/'upgrade-2.1.0/browser-accounts.json').write_text(json.dumps({'alice':ua,'bob':ub,'unbound':un,'password':PASSWORD}),encoding='utf-8')
  def test_03_nickname_and_rebind_immediate(self):
   self.edit(self.alice,self.sn1,{'nickname':'仅昵称可改'})

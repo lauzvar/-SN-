@@ -1,67 +1,133 @@
 package com.robotsn;
-import java.time.LocalDate;
+
 import java.util.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.transaction.annotation.Transactional;
-@RestController @RequestMapping("/api")
+
+@RestController
+@RequestMapping("/api")
 public class RobotApi {
- final Store s;
- public RobotApi(Store s){this.s=s;}
- @GetMapping("/me") Object me(){var a=s.account();a.put("scope_sns",s.decode(a.get("scope_sns")));return a;}
- @GetMapping("/fields") Object fields(){return s.definitions(!s.role().equals("USER"));}
- @GetMapping("/options") Object options(){var out=new LinkedHashMap<String,Object>();out.put("statuses",s.arraySetting("statuses"));if(!s.role().equals("USER")){out.put("slots",s.setting("module_slots"));out.put("rule",s.setting("sn_rule"));}return out;}
- @GetMapping("/robots") Object robots(@RequestParam(defaultValue="")String q){return s.db.queryForList("select * from robot where not deleted order by sn").stream().filter(s::allowed).map(s::visible).filter(r->s.encode(r).toLowerCase(Locale.ROOT).contains(q.toLowerCase(Locale.ROOT))).toList();}
- @GetMapping("/robots/{sn}") Object detail(@PathVariable String sn){var row=s.robot(sn,false);String current=row.get("sn").toString();var out=s.visible(row);out.put("requestedSn",sn);
-   if(!s.role().equals("USER")){
-     out.put("modules",s.db.queryForList("select * from module_installation where robot_sn=? order by id desc",current));
-     out.put("moduleHistory",s.db.queryForList("select * from module_history where robot_sn=? order by id desc",current));
-     out.put("processes",rows("select * from process_record where robot_sn=? order by id desc",current));
-     out.put("lifecycle",s.db.queryForList("select * from lifecycle_history where robot_sn=? order by id desc",current));
-     out.put("snHistory",s.db.queryForList("select * from sn_history where robot_sn=? order by id desc",current));
-     out.put("repairs",rows("select * from repair where robot_sn=? order by id desc",current));
-     out.put("repairEvents",s.db.queryForList("select e.* from repair_event e join repair r on r.id=e.repair_id where r.robot_sn=? order by e.id desc",current));
-     out.put("flashTasks",s.db.queryForList("select * from flash_task where robot_sn=? order by id desc",current));
-     out.put("readbacks",s.db.queryForList("select b.* from flash_readback b join flash_task t on t.id=b.task_id where t.robot_sn=? order by b.id desc",current));
-     out.put("source",row.get("source"));
-   }return out;
- }
- List<Map<String,Object>> rows(String sql,Object...args){var list=s.db.queryForList(sql,args);for(var r:list)for(String k:List.of("snapshot","old_value","new_value","report","cells","data"))if(r.containsKey(k))r.put(k,s.decode(r.get(k)));return list;}
- @PostMapping("/robots") @Transactional Object create(@RequestBody Map<String,Object>b){s.technical();s.reason(b);String sn=s.text(b,"sn");if(sn.isBlank()){s.snAccess();var request=new LinkedHashMap<>(b);request.put("count",1);sn=s.allocate(request,false).get(0);}s.claim(sn);
-   var f=s.validateFields(s.map(b.getOrDefault("fields",Map.of())));s.requiredOnCreate(f);if(f.containsKey("status")&&f.get("status")!=null&&!f.get("status").equals("在库"))Store.fail(400,"新建主档的初始状态只能为在库；其他状态请走流程登记");
-   s.db.update("insert into robot(sn,fields) values (?,?::jsonb)",sn,s.encode(f));s.audit("robot",sn,"CREATE","*",null,f,s.required(b,"reason"));return Map.of("sn",sn);
- }
- @PatchMapping("/robots/{sn}") @Transactional Object edit(@PathVariable String sn,@RequestBody Map<String,Object>b){var row=s.robot(sn,true);sn=row.get("sn").toString();s.revision(b,row);String why=s.required(b,"reason");var raw=s.map(b.getOrDefault("fields",Map.of()));
-   if(s.role().equals("USER")&&raw.keySet().stream().anyMatch(k->!k.equals("nickname")))Store.fail(403,"普通用户只能修改机器人昵称");
-   if(b.keySet().stream().anyMatch(k->!Set.of("fields","revision","reason").contains(k)))Store.fail(400,"不允许覆盖主键或系统字段");
-   var patch=s.validateFields(raw);if(patch.containsKey("status"))Store.fail(400,"设备状态请使用生命周期或流程操作");if(patch.containsKey("qcResult")||patch.containsKey("debugResult"))Store.fail(400,"质检与调试结果请通过流程登记，不能直接覆盖");var f=s.map(row.get("fields"));
-   for(var e:patch.entrySet()){Object old=f.put(e.getKey(),e.getValue());if(!Objects.equals(old,e.getValue()))s.audit("robot",sn,"UPDATE",e.getKey(),old,e.getValue(),why);}
-   s.db.update("update robot set fields=?::jsonb,revision=revision+1 where sn=?",s.encode(f),sn);return s.visible(s.robot(sn,false));
- }
- @DeleteMapping("/robots/{sn}") @Transactional Object delete(@PathVariable String sn,@RequestBody Map<String,Object>b){s.admin();var r=s.robot(sn,true);s.revision(b,r);sn=r.get("sn").toString();String why=s.required(b,"reason");var snapshot=s.snapshot(sn);s.db.update("update robot set deleted=true,revision=revision+1 where sn=?",sn);s.db.update("update sn_registry set status='RETIRED' where sn=?",sn);s.audit("robot",sn,"DELETE","*",snapshot,null,why);return Map.of("message","已归档删除，历史保留且 SN 不再使用");}
- @PostMapping("/robots/{sn}/status") @Transactional Object status(@PathVariable String sn,@RequestBody Map<String,Object>b){s.technical();var r=s.robot(sn,true);s.revision(b,r);sn=r.get("sn").toString();String next=s.required(b,"status");if(!s.arraySetting("statuses").contains(next))Store.fail(400,"无效状态");s.status(sn,next,s.required(b,"reason"));return Map.of("sn",sn);}
- @PostMapping("/robots/{sn}/modules") @Transactional Object module(@PathVariable String sn,@RequestBody Map<String,Object>b){s.technical();var r=s.robot(sn,true);s.revision(b,r);sn=r.get("sn").toString();String slot=s.required(b,"slot"),action=s.required(b,"action"),why=s.required(b,"reason");
-   if(!Set.of("INSTALL","REPLACE","REMOVE").contains(action))Store.fail(400,"无效装拆操作");var slots=s.setting("module_slots");if(!slots.containsKey(slot))Store.fail(400,"请先由管理员配置模组类型和数量限制");
-   String old=null,oldVersion=null,newSn=null,newVersion=null;
-   if(!action.equals("INSTALL")){var oldRow=s.one("select * from module_installation where id=? and robot_sn=? and removed_at is null for update",s.integer(b,"installationId"),sn);if(!slot.equals(oldRow.get("slot")))Store.fail(400,"模组类型与原安装记录不符");old=oldRow.get("module_sn").toString();oldVersion=(String)oldRow.get("version");s.db.update("update module_installation set removed_at=now() where id=?",oldRow.get("id"));}
-   if(!action.equals("REMOVE")){int count=s.db.queryForObject("select count(*) from module_installation where robot_sn=? and slot=? and removed_at is null",Integer.class,sn,slot);if(count>=((Number)slots.get(slot)).intValue())Store.fail(409,"该模组类型已达到装配数量限制");newSn=s.required(b,"moduleSn");newVersion=s.text(b,"version");s.db.update("insert into module_installation(robot_sn,slot,module_sn,version) values (?,?,?,?)",sn,slot,newSn,newVersion);}
-   s.db.update("insert into module_history(robot_sn,slot,action,old_sn,new_sn,old_version,new_version,actor,reason) values (?,?,?,?,?,?,?,?,?)",sn,slot,action,old,newSn,oldVersion,newVersion,s.actor(),why);s.db.update("update robot set revision=revision+1 where sn=?",sn);var after=new LinkedHashMap<String,Object>();after.put("sn",newSn);after.put("version",newVersion);s.audit("robot",sn,"MODULE_"+action,slot,old,after,why);return Map.of("sn",sn);
- }
- @PostMapping("/robots/{sn}/processes") @Transactional Object process(@PathVariable String sn,@RequestBody Map<String,Object>b){s.technical();var r=s.robot(sn,true);s.revision(b,r);sn=r.get("sn").toString();String type=s.required(b,"type"),why=s.required(b,"reason"),result=s.text(b,"result");if(!List.of("装配","调试","质检","入库","出库","交付","现场安装","售后","维修","报废").contains(type))Store.fail(400,"不支持的流程类型");
-   LocalDate date=b.containsKey("date")&&!s.text(b,"date").isBlank()?LocalDate.parse(s.text(b,"date")):LocalDate.now();String operator=s.text(b,"operator");if(operator.isBlank())operator=s.actor();String report=s.text(b,"documentNo");
-   var f=s.map(r.get("fields"));if(type.equals("质检")||type.equals("调试")){if(!Set.of("通过","不通过","待复检").contains(result))Store.fail(400,"请选择质检或调试结果");String prefix=type.equals("质检")?"qc":"debug";for(var e:Map.of(prefix+"Result",result,prefix+"Person",operator,prefix+"Date",date.toString()).entrySet()){Object old=f.put(e.getKey(),e.getValue());s.audit("robot",sn,"PROCESS",e.getKey(),old,e.getValue(),why);}if(type.equals("质检")){Object old=f.put("qcReport",report);s.audit("robot",sn,"PROCESS","qcReport",old,report,why);}s.db.update("update robot set fields=?::jsonb where sn=?",s.encode(f),sn);}
-   String status=switch(type){case "入库"->"在库";case "出库"->"已出库";case "交付"->"已交付";case "维修"->"维修中";case "报废"->"已报废";default->null;};if(status!=null)s.status(sn,status,why);
-   if(type.equals("交付")){s.db.update("update robot set fields=jsonb_set(fields,'{deliveryDate}',to_jsonb(?::text)) where sn=?",date.toString(),sn);s.audit("robot",sn,"PROCESS","deliveryDate",f.get("deliveryDate"),date.toString(),why);}
-   s.db.update("insert into process_record(robot_sn,type,result,document_no,note,operator_name,actor,business_date,snapshot) values (?,?,?,?,?,?,?,?,?::jsonb)",sn,type,result,report,why,operator,s.actor(),date,s.encode(s.snapshot(sn)));s.db.update("update robot set revision=revision+1 where sn=?",sn);s.audit("robot",sn,"PROCESS",type,null,b,why);return Map.of("sn",sn);
- }
- @PostMapping("/robots/{sn}/repairs") @Transactional Object repair(@PathVariable String sn,@RequestBody Map<String,Object>b){s.technical();var r=s.robot(sn,true);s.revision(b,r);sn=r.get("sn").toString();String why=s.required(b,"reason");Object snapshot=s.snapshot(sn);s.status(sn,"维修中",why);Long id=s.db.queryForObject("insert into repair(robot_sn,description,snapshot,actor) values (?,?,?::jsonb,?) returning id",Long.class,sn,why,s.encode(snapshot),s.actor());s.db.update("insert into repair_event(repair_id,status,result,actor) values (?,'待处理',?,?)",id,why,s.actor());s.audit("robot",sn,"REPAIR","repair",null,id,why);return Map.of("id",id);}
- @PostMapping("/repairs/{id}/handle") @Transactional Object handle(@PathVariable long id,@RequestBody Map<String,Object>b){s.technical();var initial=s.one("select robot_sn from repair where id=?",id);String sn=s.robot(initial.get("robot_sn").toString(),true).get("sn").toString();var repair=s.one("select * from repair where id=? for update",id);String state=s.required(b,"status"),why=s.required(b,"reason");if(repair.get("status").equals("已完成"))Store.fail(409,"维修已完成，不可覆盖处理记录");if(!Set.of("处理中","已完成").contains(state))Store.fail(400,"无效维修状态");if(state.equals("已完成"))s.required(b,"result");s.db.update("update repair set status=? where id=?",state,id);s.db.update("insert into repair_event(repair_id,status,result,actor) values (?,?,?,?)",id,state,s.text(b,"result")+"；"+why,s.actor());if(state.equals("已完成")&&s.db.queryForObject("select count(*) from repair where robot_sn=? and status<>'已完成'",Integer.class,sn)==0)s.status(sn,"在库",why);s.db.update("update robot set revision=revision+1 where sn=?",sn);s.audit("robot",sn,"REPAIR_HANDLE","repair:"+id,repair.get("status"),state,why);return Map.of("sn",sn);}
- @PostMapping("/sn/generate") @Transactional Object generate(@RequestBody Map<String,Object>b){s.snAccess();return Map.of("sns",s.allocate(b,false));}
- @PostMapping("/sn/ranges") @Transactional Object range(@RequestBody Map<String,Object>b){s.admin();return Map.of("sns",s.allocate(b,true));}
- @GetMapping("/sn") Object sns(){s.technical();var out=new LinkedHashMap<String,Object>();out.put("numbers",s.db.queryForList("select n.* from sn_registry n left join sn_range r on r.id=n.range_id where ?='ADMIN' or n.actor=? or r.assignee=? order by n.sn desc",s.role(),s.actor(),s.actor()));out.put("ranges",s.db.queryForList("select * from sn_range where ?='ADMIN' or assignee=? order by id desc",s.role(),s.actor()));out.put("counters",s.db.queryForList("select * from sn_counter order by month desc,type"));return out;}
- @PostMapping("/sn/{sn}/void") @Transactional Object voidSn(@PathVariable String sn,@RequestBody Map<String,Object>b){s.snAccess();var n=s.one("select n.*,r.assignee from sn_registry n left join sn_range r on r.id=n.range_id where n.sn=? for update of n",sn);if(!s.role().equals("ADMIN")&&!s.actor().equals(n.get("actor"))&&!s.actor().equals(n.get("assignee")))Store.fail(403,"只能作废本人生成或获配的编号");if(!n.get("status").equals("UNUSED"))Store.fail(409,"仅未使用 SN 可作废；已使用 SN 请使用迁移或删除主档流程");s.db.update("update sn_registry set status='VOID' where sn=?",sn);s.audit("sn",sn,"VOID","status","UNUSED","VOID",s.required(b,"reason"));return Map.of("sn",sn);}
- @PostMapping("/robots/{sn}/migrate") @Transactional Object migrate(@PathVariable String sn,@RequestBody Map<String,Object>b){s.snAccess();var r=s.robot(sn,true);s.revision(b,r);sn=r.get("sn").toString();String why=s.required(b,"reason"),evidence=s.required(b,"evidence"),kind=s.required(b,"kind");if(!List.of("迁移","维修替换").contains(kind))Store.fail(400,"无效变更类型");String next=s.required(b,"newSn");if(kind.equals("维修替换")&&!next.matches("LBR-[0-9]{4}-R-[0-9]{4}"))Store.fail(400,"维修替换需要 R 类型 SN");
-   s.claim(next);s.db.update("update robot set sn=?,revision=revision+1 where sn=?",next,sn);s.db.update("update sn_registry set status='RETIRED' where sn=?",sn);s.db.update("insert into sn_history(robot_sn,old_sn,new_sn,type,reason,evidence,actor) values (?,?,?,?,?,?,?)",next,sn,next,kind,why,evidence,s.actor());s.db.update("update flash_task set status='STALE' where robot_sn=? and expected_sn<>?",next,next);s.audit("robot",next,"MIGRATE","sn",sn,next,why+"；凭证："+evidence);return Map.of("sn",next);
- }
- @PostMapping("/robots/{sn}/flash") @Transactional Object flash(@PathVariable String sn,@RequestBody Map<String,Object>b){s.technical();sn=s.robot(sn,true).get("sn").toString();String device=s.required(b,"deviceId");Long id=s.db.queryForObject("insert into flash_task(robot_sn,expected_sn,device_id,actor) values (?,?,?,?) returning id",Long.class,sn,sn,device,s.actor());s.audit("robot",sn,"FLASH_TASK","flash",null,id,s.required(b,"reason"));return Map.of("id",id,"expectedSn",sn,"status","PENDING","mode","MANUAL_EVIDENCE");}
- @PostMapping("/flash/{id}/readback") @Transactional Object readback(@PathVariable long id,@RequestBody Map<String,Object>b){s.technical();var original=s.one("select robot_sn from flash_task where id=?",id);String sn=s.robot(original.get("robot_sn").toString(),true).get("sn").toString();var task=s.one("select * from flash_task where id=? for update",id);if(!task.get("expected_sn").equals(sn))Store.fail(409,"SN 已迁移，请创建新写入任务");String actual=s.required(b,"actualSn"),evidence=s.required(b,"evidence");boolean matched=actual.equals(task.get("expected_sn"));s.db.update("insert into flash_readback(task_id,actual_sn,matched,evidence,actor) values (?,?,?,?,?)",id,actual,matched,evidence,s.actor());s.db.update("update flash_task set status=? where id=?",matched?"MATCHED":"MISMATCH",id);s.audit("robot",sn,"FLASH_READBACK","flash:"+id,task.get("status"),Map.of("actualSn",actual,"matched",matched),evidence);return Map.of("matched",matched,"message",matched?"录入的回读值与数据库一致（人工凭证）":"回读不一致，请检查设备后重新提交");}
+  private final RobotQueryService queries;
+  private final RobotService robots;
+  private final AssemblyService assembly;
+  private final ProcessService processes;
+  private final RepairService repairs;
+  private final SnService numbers;
+  private final FlashService flash;
+
+  public RobotApi(
+      RobotQueryService queries,
+      RobotService robots,
+      AssemblyService assembly,
+      ProcessService processes,
+      RepairService repairs,
+      SnService numbers,
+      FlashService flash) {
+    this.queries = queries;
+    this.robots = robots;
+    this.assembly = assembly;
+    this.processes = processes;
+    this.repairs = repairs;
+    this.numbers = numbers;
+    this.flash = flash;
+  }
+
+  @GetMapping("/me")
+  Object me() {
+    return queries.me();
+  }
+
+  @GetMapping("/fields")
+  Object fields() {
+    return queries.fields();
+  }
+
+  @GetMapping("/options")
+  Object options() {
+    return queries.options();
+  }
+
+  @GetMapping("/robots")
+  Object robots(@RequestParam(defaultValue = "") String q) {
+    return queries.robots(q);
+  }
+
+  @GetMapping("/robots/{sn}")
+  Object detail(@PathVariable String sn) {
+    return queries.detail(sn);
+  }
+
+  @GetMapping("/sn")
+  Object sns() {
+    return queries.sns();
+  }
+
+  @PostMapping("/robots")
+  Object create(@RequestBody Map<String, Object> b) {
+    return robots.create(CreateRobotRequest.from(b));
+  }
+
+  @PatchMapping("/robots/{sn}")
+  Object edit(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return robots.edit(sn, b);
+  }
+
+  @DeleteMapping("/robots/{sn}")
+  Object delete(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return robots.delete(sn, b);
+  }
+
+  @PostMapping("/robots/{sn}/status")
+  Object status(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return robots.status(sn, b);
+  }
+
+  @PostMapping("/robots/{sn}/migrate")
+  Object migrate(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return robots.migrate(sn, b);
+  }
+
+  @PostMapping("/robots/{sn}/modules")
+  Object module(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return assembly.module(sn, b);
+  }
+
+  @PostMapping("/robots/{sn}/processes")
+  Object process(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return processes.process(sn, b);
+  }
+
+  @PostMapping("/robots/{sn}/repairs")
+  Object repair(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return repairs.repair(sn, b);
+  }
+
+  @PostMapping("/repairs/{id}/handle")
+  Object handle(@PathVariable long id, @RequestBody Map<String, Object> b) {
+    return repairs.handle(id, b);
+  }
+
+  @PostMapping("/sn/generate")
+  Object generate(@RequestBody Map<String, Object> b) {
+    return numbers.generate(b);
+  }
+
+  @PostMapping("/sn/ranges")
+  Object range(@RequestBody Map<String, Object> b) {
+    return numbers.range(b);
+  }
+
+  @PostMapping("/sn/{sn}/void")
+  Object voidSn(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return numbers.voidSn(sn, b);
+  }
+
+  @PostMapping("/robots/{sn}/flash")
+  Object flash(@PathVariable String sn, @RequestBody Map<String, Object> b) {
+    return flash.flash(sn, b);
+  }
+
+  @PostMapping("/flash/{id}/readback")
+  Object readback(@PathVariable long id, @RequestBody Map<String, Object> b) {
+    return flash.readback(id, b);
+  }
 }
