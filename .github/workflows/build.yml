@@ -25,10 +25,12 @@ jobs:
       VALENBOT_DB_USER: postgres
       VALENBOT_DB_PASSWORD: ephemeral_ci_database_only
       VALENBOT_TEST_ACK: robot_sn_v2_test
-      VALENBOT_TEST_PRIVATE: ${{ runner.temp }}/valenbot-test
-      VALENBOT_BOOTSTRAP_FILE: ${{ runner.temp }}/valenbot-test/bootstrap.json
     steps:
       - uses: actions/checkout@v4
+      - name: Set private test paths
+        run: |
+          echo "VALENBOT_TEST_PRIVATE=$RUNNER_TEMP/valenbot-test" >> "$GITHUB_ENV"
+          echo "VALENBOT_BOOTSTRAP_FILE=$RUNNER_TEMP/valenbot-test/bootstrap.json" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
