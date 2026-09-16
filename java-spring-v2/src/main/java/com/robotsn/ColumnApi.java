@@ -1,15 +1,39 @@
 package com.robotsn;
+
 import java.util.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.transaction.annotation.Transactional;
-@RestController @RequestMapping("/api/fields")
+
+@RestController
+@RequestMapping("/api/fields")
 public class ColumnApi {
- final Store s;
- public ColumnApi(Store s){this.s=s;}
- @GetMapping("/all") Object all(){s.admin();return s.db.queryForList("select * from field_def order by ordinal,key");}
- @PostMapping @Transactional Object create(@RequestBody Map<String,Object>b){s.admin();String key=s.required(b,"key");if(!key.matches("custom_[a-zA-Z0-9_]{1,48}"))Store.fail(400,"自定义字段标识需以 custom_ 开头");var v=definition(b,null);s.db.update("insert into field_def(key,label,group_name,data_type,ordinal,required,customer_visible) values (?,?,?,?,?,?,?)",key,v.get("label"),v.get("group"),v.get("dataType"),v.get("ordinal"),v.get("required"),v.get("customerVisible"));s.audit("field",key,"CREATE","definition",null,v,s.required(b,"reason"));return Map.of("key",key);}
- @PatchMapping("/{key}") @Transactional Object edit(@PathVariable String key,@RequestBody Map<String,Object>b){s.admin();var old=s.one("select * from field_def where key=? for update",key);s.revision(b,old);var v=definition(b,old);if(!v.get("dataType").equals(old.get("data_type")))Store.fail(409,"字段创建后类型不可直接改变，以免误解历史值；请新增正确类型字段");s.db.update("update field_def set label=?,group_name=?,ordinal=?,required=?,customer_visible=?,revision=revision+1 where key=?",v.get("label"),v.get("group"),v.get("ordinal"),v.get("required"),v.get("customerVisible"),key);s.audit("field",key,"UPDATE","definition",old,v,s.required(b,"reason"));return Map.of("key",key);}
- @DeleteMapping("/{key}") @Transactional Object delete(@PathVariable String key,@RequestBody Map<String,Object>b){s.admin();var old=s.one("select * from field_def where key=? and active for update",key);s.revision(b,old);s.db.update("update field_def set active=false,revision=revision+1 where key=?",key);s.audit("field",key,"ARCHIVE","definition",old,Map.of("active",false),s.required(b,"reason"));return Map.of("key",key,"message","展示列已归档；原值、底层身份和权限逻辑继续保留");}
- @PostMapping("/{key}/restore") @Transactional Object restore(@PathVariable String key,@RequestBody Map<String,Object>b){s.admin();var old=s.one("select * from field_def where key=? and not active for update",key);s.revision(b,old);s.db.update("update field_def set active=true,revision=revision+1 where key=?",key);s.audit("field",key,"RESTORE","definition",old,Map.of("active",true),s.required(b,"reason"));return Map.of("key",key);}
- Map<String,Object> definition(Map<String,Object>b,Map<String,Object>old){var v=new LinkedHashMap<String,Object>();String label=old==null||b.containsKey("label")?s.required(b,"label"):old.get("label").toString();if(label.length()>100)Store.fail(400,"字段名称最长 100 个字符");String group=b.containsKey("group")?s.text(b,"group"):old==null?"BLUE":old.get("group_name").toString();String type=b.containsKey("dataType")?s.text(b,"dataType"):old==null?"text":old.get("data_type").toString();if(!Set.of("GREEN","YELLOW","BLUE","ORANGE").contains(group)||!Set.of("text","date","mac","number","boolean").contains(type))Store.fail(400,"无效字段分组或类型");int ordinal=b.containsKey("ordinal")?s.integer(b,"ordinal"):old==null?100:((Number)old.get("ordinal")).intValue();if(ordinal<0||ordinal>10000)Store.fail(400,"显示顺序范围 0–10000");boolean required=b.containsKey("required")?Boolean.TRUE.equals(b.get("required")):old!=null&&Boolean.TRUE.equals(old.get("required"));boolean visible=b.containsKey("customerVisible")?Boolean.TRUE.equals(b.get("customerVisible")):old!=null&&Boolean.TRUE.equals(old.get("customer_visible"));if(old!=null&&!old.get("storage_kind").equals("FIELD")&&required)Store.fail(400,"SN / 模组关联是系统字段，不能设为表单必填");v.put("label",label);v.put("group",group);v.put("dataType",type);v.put("ordinal",ordinal);v.put("required",required);v.put("customerVisible",visible);return v;}
+  private final ColumnService columns;
+
+  public ColumnApi(ColumnService columns) {
+    this.columns = columns;
+  }
+
+  @GetMapping("/all")
+  Object all() {
+    return columns.all();
+  }
+
+  @PostMapping
+  Object create(@RequestBody Map<String, Object> b) {
+    return columns.create(b);
+  }
+
+  @PatchMapping("/{key}")
+  Object edit(@PathVariable String key, @RequestBody Map<String, Object> b) {
+    return columns.edit(key, b);
+  }
+
+  @DeleteMapping("/{key}")
+  Object delete(@PathVariable String key, @RequestBody Map<String, Object> b) {
+    return columns.delete(key, b);
+  }
+
+  @PostMapping("/{key}/restore")
+  Object restore(@PathVariable String key, @RequestBody Map<String, Object> b) {
+    return columns.restore(key, b);
+  }
 }

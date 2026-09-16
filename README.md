@@ -1,6 +1,12 @@
 # Valenbot 机器人 SN 管理系统
 
-Java Spring Boot + PostgreSQL 实现的机器人全生命周期管理工作台，当前版本 **v2.1.0**。网页界面采用中文工业工作台设计，支持局域网部署，运行不依赖 Docker。
+Java Spring Boot + PostgreSQL 实现的机器人全生命周期管理工作台，当前版本 **v2.2.0**。网页界面采用中文工业工作台设计，支持局域网部署，运行不依赖 Docker。
+
+## v2.2 更新
+
+业务用例与 SQL 分层，Controller 不再互相调用；新建默认在库，质检/调试/交付字段只能通过流程登记。流程日期必须明确，配置严格拒绝非法数值。权限先在数据库筛选，字段与模组批量组装，保留客户绑定和历史追溯。
+
+详情见 [架构与升级说明](java-spring-v2/v2.2-架构与升级说明.md)。本版没有 schema 变更，已安装 v2.1 时保留数据库与配置，只替换 JAR 和启动器；V1/V2 迁移不改写。
 
 ## 已有功能
 
@@ -27,7 +33,7 @@ cd java-spring-v2
 mvn clean package
 ```
 
-构建产物：`java-spring-v2/target/robot-sn-system-2.1.0.jar`。
+构建产物：`java-spring-v2/target/robot-sn-system-2.2.0.jar`。
 
 1. 在 PostgreSQL 创建独立登录角色 `robot_v2` 和数据库 `robot_sn_v2`，数据库由该角色拥有。不要复用其他业务系统的数据库。
 2. 在仓库根目录创建私有 `runtime/v2` 目录，将构建 JAR 放到其中。
@@ -52,7 +58,7 @@ Flyway 首次启动自动建立结构，现有 v2.0 数据库启动新版时自�
 ## 文档
 
 - [完整使用与部署说明](java-spring-v2/README.md)
-- [v2.1.0 变更与测试报告](java-spring-v2/变更与测试报告-v2.1.0.md)
+- [v2.2.0 变更与测试报告](java-spring-v2/变更与测试报告-v2.2.0.md)
 - [权限、类图与时序](java-spring-v2/权限与交互模型.md)
 - [SN 编码中心、业务表与导入来源说明](SN编码中心、业务表与导入来源功能说明.md)
 - [ERPNext 需求与界面对比](Valenbot与ERPNext-SN管理需求及界面对比.md)
@@ -61,9 +67,9 @@ Flyway 首次启动自动建立结构，现有 v2.0 数据库启动新版时自�
 
 ## 测试与构建
 
-`mvn clean verify` 运行二维码反向解码、CSV 转义单元测试并构建软件。GitHub Actions 使用 Java 17 自动构建，可在成功运行的 Artifacts 中下载 JAR。
+`mvn clean verify` 运行 32 项无数据库测试。完整验证需独立 PostgreSQL 测试库，共 34 项 JUnit（含 2 项事务回滚）及 14 组 HTTP 验收。GitHub Actions 使用 Java 17 + 临时 PostgreSQL 16 自动执行完整测试，可在成功运行的 Artifacts 中下载 JAR 和测试报告。
 
-`java-spring-v2/tests/test_v21.py` 是带写入操作的 7 组 HTTP 验收，需要独立的 `robot_sn_v2_test` 数据库、8083 测试服务及私有初始化夹具；不能直接对生产运行。具体准备要求见工程 README 和测试报告。
+使用 `tests/synthetic_fixture.py` 生成随机密码与合成台账，`tests/run_acceptance.py` 自动运行 v2.1 的 7 组和 v2.2 的 7 组 HTTP 验收。必须使用独立 `robot_sn_v2_test`、空测试 schema 与 8083 端口；不能对生产运行。准备步骤见架构与升级说明。
 
 ## 项目目录
 
